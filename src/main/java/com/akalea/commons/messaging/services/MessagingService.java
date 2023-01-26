@@ -8,6 +8,8 @@ import com.akalea.commons.messaging.message.MsgReceipt;
 public interface MessagingService {
     
     MessagingService connect();
+    
+    MessagingService disconnect();
 
     MsgReceipt sendMessage(Msg message);
 

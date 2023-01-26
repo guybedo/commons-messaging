@@ -12,7 +12,6 @@ import com.google.common.collect.Lists;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.model.Message;
 import com.pengrad.telegrambot.model.Update;
-import com.pengrad.telegrambot.model.request.ForceReply;
 import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.request.GetUpdates;
 import com.pengrad.telegrambot.request.SendMessage;
@@ -26,6 +25,12 @@ public class TelegramService extends ServiceBase {
     public TelegramService connect() {
         this.bot =
             new TelegramBot.Builder(credentials.getToken()).build();
+        return this;
+    }
+
+    public TelegramService disconnect() {
+        this.bot.shutdown();
+        this.bot = null;
         return this;
     }
 
@@ -60,9 +65,10 @@ public class TelegramService extends ServiceBase {
             GetUpdatesResponse updatesResponse = bot.execute(getUpdates);
             List<Update> page = updatesResponse.updates();
             allUpdates.addAll(page);
-            if (page.isEmpty() || page.size() < pageSize) {
+            if (page.isEmpty()) {
                 break;
             }
+            offset = page.get(page.size() - 1).updateId() + 1;
         }
         return allUpdates
             .stream()

@@ -1,5 +1,7 @@
 package com.akalea.commons.messaging;
 
+import java.util.function.Consumer;
+
 import com.akalea.commons.messaging.services.MessagingService;
 import com.akalea.commons.messaging.services.MessagingServiceCredentials;
 import com.akalea.commons.messaging.services.MessagingServiceId;
@@ -14,4 +16,17 @@ public class Messaging {
             return new TelegramService().setCredentials(credentials);
         throw new RuntimeException("Not implemented yet");
     };
+
+    public static void transaction(
+        MessagingServiceId serviceId,
+        MessagingServiceCredentials credentials,
+        Consumer<MessagingService> func) {
+        MessagingService messageService = messageService(serviceId, credentials);
+        messageService.connect();
+        try {
+            func.accept(messageService);
+        } finally {
+            messageService.disconnect();
+        }
+    }
 }
