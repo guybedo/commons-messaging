@@ -7,11 +7,11 @@ import com.akalea.commons.messaging.services.telegram.TelegramMessageService;
 
 public class Messaging {
 
-    public MessageService messageService(
+    public static MessageService messageService(
         MessageServiceId id,
-        MessageServiceCredentials crendetials) {
+        MessageServiceCredentials credentials) {
         if (MessageServiceId.telegram.equals(id))
-            return new TelegramMessageService();
+            return new TelegramMessageService().setCredentials(credentials);
         throw new RuntimeException("Not implemented yet");
     };
 }

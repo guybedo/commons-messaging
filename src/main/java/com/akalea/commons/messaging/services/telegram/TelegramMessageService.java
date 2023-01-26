@@ -5,6 +5,7 @@ import java.util.stream.Collectors;
 
 import com.akalea.commons.messaging.message.Msg;
 import com.akalea.commons.messaging.message.MsgResult;
+import com.akalea.commons.messaging.message.User;
 import com.akalea.commons.messaging.services.ServiceBase;
 import com.google.common.collect.Lists;
 import com.pengrad.telegrambot.TelegramBot;
@@ -21,15 +22,16 @@ public class TelegramMessageService extends ServiceBase {
 
     private TelegramBot bot;
 
-    public void connect() {
+    public TelegramMessageService connect() {
         this.bot =
             new TelegramBot.Builder(credentials.getToken()).build();
+        return this;
     }
 
     @Override
     public MsgResult sendMessage(Msg msg) {
         SendMessage request =
-            new SendMessage(msg.getRecipientId(), msg.getContent())
+            new SendMessage(msg.getRecipient(), msg.getContent())
                 .parseMode(ParseMode.HTML)
                 .disableWebPagePreview(true)
                 .disableNotification(true)
@@ -44,7 +46,7 @@ public class TelegramMessageService extends ServiceBase {
             .setSuccess(ok);
     }
 
-    public List<Msg> getNewMessages(boolean confirm) {
+    public List<Msg> getNewMessages() {
         int pageSize = 100;
         int offset = 0;
         List<Update> allUpdates = Lists.newArrayList();
@@ -65,10 +67,12 @@ public class TelegramMessageService extends ServiceBase {
             .stream()
             .map(
                 u -> new Msg()
-                    .setUserId(String.valueOf(u.message().from().id()))
-                    .setAddress(String.valueOf(u.message().chat().id())))
+                    .setUser(
+                        new User()
+                            .setId(String.valueOf(u.message().from().id()))
+                            .setUuid(u.message().from().username()))
+                    .setChatId(String.valueOf(u.message().chat().id())))
             .collect(Collectors.toList());
-
     }
 
 }
