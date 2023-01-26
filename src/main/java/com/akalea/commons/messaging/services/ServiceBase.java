@@ -1,14 +1,14 @@
 package com.akalea.commons.messaging.services;
 
-public abstract class ServiceBase implements MessageService {
+public abstract class ServiceBase implements MessagingService {
 
-    protected MessageServiceCredentials credentials;
+    protected MessagingServiceCredentials credentials;
 
-    public MessageServiceCredentials getCredentials() {
+    public MessagingServiceCredentials getCredentials() {
         return credentials;
     }
 
-    public ServiceBase setCredentials(MessageServiceCredentials credentials) {
+    public ServiceBase setCredentials(MessagingServiceCredentials credentials) {
         this.credentials = credentials;
         return this;
     }

@@ -1,5 +1,5 @@
 package com.akalea.commons.messaging.services;
 
-public enum MessageServiceId {
+public enum MessagingServiceId {
         telegram, discord, slack, email;
 }

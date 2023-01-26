@@ -19,11 +19,11 @@ import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.GetUpdatesResponse;
 import com.pengrad.telegrambot.response.SendResponse;
 
-public class TelegramMessageService extends ServiceBase {
+public class TelegramService extends ServiceBase {
 
     private TelegramBot bot;
 
-    public TelegramMessageService connect() {
+    public TelegramService connect() {
         this.bot =
             new TelegramBot.Builder(credentials.getToken()).build();
         return this;

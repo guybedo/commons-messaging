@@ -1,6 +1,6 @@
 package com.akalea.commons.messaging.services;
 
-public class MessageServiceCredentials {
+public class MessagingServiceCredentials {
 
     private String uuid;
     private String key;
@@ -10,7 +10,7 @@ public class MessageServiceCredentials {
         return uuid;
     }
 
-    public MessageServiceCredentials setUuid(String uuid) {
+    public MessagingServiceCredentials setUuid(String uuid) {
         this.uuid = uuid;
         return this;
     }
@@ -19,7 +19,7 @@ public class MessageServiceCredentials {
         return key;
     }
 
-    public MessageServiceCredentials setKey(String key) {
+    public MessagingServiceCredentials setKey(String key) {
         this.key = key;
         return this;
     }
@@ -28,7 +28,7 @@ public class MessageServiceCredentials {
         return token;
     }
 
-    public MessageServiceCredentials setToken(String token) {
+    public MessagingServiceCredentials setToken(String token) {
         this.token = token;
         return this;
     }

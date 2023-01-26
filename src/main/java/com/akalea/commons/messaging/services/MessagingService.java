@@ -5,9 +5,9 @@ import java.util.List;
 import com.akalea.commons.messaging.message.Msg;
 import com.akalea.commons.messaging.message.MsgReceipt;
 
-public interface MessageService {
+public interface MessagingService {
     
-    MessageService connect();
+    MessagingService connect();
 
     MsgReceipt sendMessage(Msg message);
 
