@@ -2,11 +2,32 @@ package com.akalea.commons.messaging.message;
 
 public class Msg {
 
-    private User   user;
-    private String chatId;
+    private String id;
 
-    private User   recipient;
+    private User user;
+    private User recipient;
+
+    private Msg replyTo;
+
     private String content;
+
+    public String getId() {
+        return id;
+    }
+
+    public Msg setId(String id) {
+        this.id = id;
+        return this;
+    }
+
+    public Msg getReplyTo() {
+        return replyTo;
+    }
+
+    public Msg setReplyTo(Msg replyTo) {
+        this.replyTo = replyTo;
+        return this;
+    }
 
     public User getUser() {
         return user;
@@ -14,15 +35,6 @@ public class Msg {
 
     public Msg setUser(User userId) {
         this.user = userId;
-        return this;
-    }
-
-    public String getChatId() {
-        return chatId;
-    }
-
-    public Msg setChatId(String address) {
-        this.chatId = address;
         return this;
     }
 

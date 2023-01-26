@@ -1,10 +1,11 @@
 package com.akalea.commons.messaging.services.telegram;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import com.akalea.commons.messaging.message.Msg;
-import com.akalea.commons.messaging.message.MsgResult;
+import com.akalea.commons.messaging.message.MsgReceipt;
 import com.akalea.commons.messaging.message.User;
 import com.akalea.commons.messaging.services.ServiceBase;
 import com.google.common.collect.Lists;
@@ -29,20 +30,20 @@ public class TelegramMessageService extends ServiceBase {
     }
 
     @Override
-    public MsgResult sendMessage(Msg msg) {
+    public MsgReceipt sendMessage(Msg msg) {
         SendMessage request =
-            new SendMessage(msg.getRecipient(), msg.getContent())
+            new SendMessage(msg.getRecipient().getId(), msg.getContent())
                 .parseMode(ParseMode.HTML)
-                .disableWebPagePreview(true)
-                .disableNotification(true)
-                .replyToMessageId(1)
-                .replyMarkup(new ForceReply());
+                .disableWebPagePreview(true);
+        Optional
+            .ofNullable(msg.getReplyTo())
+            .ifPresent(rt -> request.replyToMessageId(Integer.parseInt(rt.getId())));
 
         SendResponse sendResponse = bot.execute(request);
         boolean ok = sendResponse.isOk();
         Message result = sendResponse.message();
-        return new MsgResult()
-            .setMessageId(String.valueOf(result.messageId()))
+        return new MsgReceipt()
+            .setMessage(new Msg().setId(String.valueOf(result.messageId())))
             .setSuccess(ok);
     }
 
@@ -67,11 +68,11 @@ public class TelegramMessageService extends ServiceBase {
             .stream()
             .map(
                 u -> new Msg()
+                    .setId(String.valueOf(u.message().messageId()))
                     .setUser(
                         new User()
                             .setId(String.valueOf(u.message().from().id()))
-                            .setUuid(u.message().from().username()))
-                    .setChatId(String.valueOf(u.message().chat().id())))
+                            .setUuid(u.message().from().username())))
             .collect(Collectors.toList());
     }
 
