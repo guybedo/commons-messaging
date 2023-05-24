@@ -10,6 +10,17 @@ public class Msg {
     private Msg replyTo;
 
     private String content;
+    private MsgMedia  media;
+
+    public MsgMedia getMedia() {
+        return media;
+    }
+
+    public Msg setMedia(MsgMedia media) {
+        this.media = media;
+        return this;
+
+    }
 
     public String getId() {
         return id;
