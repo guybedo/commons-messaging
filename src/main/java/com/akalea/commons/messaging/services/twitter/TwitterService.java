@@ -14,6 +14,7 @@ import io.github.redouane59.twitter.dto.tweet.MediaCategory;
 import io.github.redouane59.twitter.dto.tweet.Tweet;
 import io.github.redouane59.twitter.dto.tweet.TweetParameters;
 import io.github.redouane59.twitter.dto.tweet.TweetParameters.Media;
+import io.github.redouane59.twitter.dto.tweet.TweetParameters.Reply;
 import io.github.redouane59.twitter.dto.tweet.TweetParameters.TweetParametersBuilder;
 import io.github.redouane59.twitter.dto.tweet.UploadMediaResponse;
 import io.github.redouane59.twitter.signature.TwitterCredentials;
@@ -60,6 +61,43 @@ public class TwitterService extends ServiceBase {
                 TweetParameters
                     .builder()
                     .text(msg.getContent());
+            if (msg.getMedia() != null) {
+                String mediaId = uploadMedia(msg.getMedia());
+                builder =
+                    builder.media(
+                        Media
+                            .builder()
+                            .mediaIds(Lists.newArrayList(mediaId))
+                            .build());
+            }
+            TweetParameters tweetParameters = builder.build();
+            Tweet tweet = client.postTweet(tweetParameters);
+            MsgReceipt receipt =
+                new MsgReceipt()
+                    .setMessage(new Msg().setId(tweet.getId()))
+                    .setSuccess(true);
+            if (!msg.getThread().isEmpty()) {
+                String parentMessageId = receipt.getMessage().getId();
+                for (Msg reply : msg.getThread()) {
+                    MsgReceipt replyReceipt = reply(parentMessageId, reply);
+                    if (replyReceipt == null)
+                        break;
+                    parentMessageId = replyReceipt.getMessage().getId();
+                }
+            }
+            return receipt;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public MsgReceipt reply(String parentMsgId, Msg msg) {
+        try {
+            TweetParametersBuilder builder =
+                TweetParameters
+                    .builder()
+                    .text(msg.getContent())
+                    .reply(Reply.builder().inReplyToTweetId(parentMsgId).build());
             if (msg.getMedia() != null) {
                 String mediaId = uploadMedia(msg.getMedia());
                 builder =

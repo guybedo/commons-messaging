@@ -1,5 +1,9 @@
 package com.akalea.commons.messaging.message;
 
+import java.util.List;
+
+import com.google.common.collect.Lists;
+
 public class Msg {
 
     private String id;
@@ -9,8 +13,23 @@ public class Msg {
 
     private Msg replyTo;
 
-    private String content;
-    private MsgMedia  media;
+    private String   content;
+    private MsgMedia media;
+
+    private List<Msg> thread = Lists.newArrayList();
+
+    public List<Msg> getThread() {
+        return thread;
+    }
+
+    public Msg setThread(Msg... thread) {
+        return setThread(Lists.newArrayList(thread));
+    }
+
+    public Msg setThread(List<Msg> thread) {
+        this.thread = thread;
+        return this;
+    }
 
     public MsgMedia getMedia() {
         return media;
