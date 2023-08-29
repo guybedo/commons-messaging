@@ -7,6 +7,7 @@ import com.akalea.commons.messaging.services.MessagingServiceCredentials;
 import com.akalea.commons.messaging.services.MessagingServiceId;
 import com.akalea.commons.messaging.services.slack.SlackService;
 import com.akalea.commons.messaging.services.telegram.TelegramService;
+import com.akalea.commons.messaging.services.twilio.TwilioService;
 
 public class Messaging {
 
@@ -17,6 +18,8 @@ public class Messaging {
             return new TelegramService().setCredentials(credentials);
         else if (MessagingServiceId.slack.equals(id))
             return new SlackService().setCredentials(credentials);
+        else if (MessagingServiceId.sms.equals(id))
+            return new TwilioService().setCredentials(credentials);
         throw new RuntimeException("Not implemented yet");
     };
 

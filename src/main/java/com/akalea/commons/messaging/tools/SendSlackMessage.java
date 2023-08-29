@@ -16,7 +16,7 @@ public class SendSlackMessage {
             new Msg()
                 .setRecipient(
                     new User().setUuid(
-                        "https://hooks.slack.com/services/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"))
+                        "https://hooks.slack.com/services/xxx"))
                 .setContent("test"));
     }
 }

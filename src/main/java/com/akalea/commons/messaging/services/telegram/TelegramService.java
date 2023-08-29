@@ -25,6 +25,7 @@ public class TelegramService extends ServiceBase {
     public TelegramService connect() {
         this.bot =
             new TelegramBot.Builder(credentials.getToken()).build();
+        this.connected = true;
         return this;
     }
 
@@ -36,6 +37,8 @@ public class TelegramService extends ServiceBase {
 
     @Override
     public MsgReceipt sendMessage(Msg msg) {
+        if (!this.connected)
+            this.connect();
         SendMessage request =
             new SendMessage(msg.getRecipient().getId(), msg.getContent())
                 .parseMode(ParseMode.HTML)
