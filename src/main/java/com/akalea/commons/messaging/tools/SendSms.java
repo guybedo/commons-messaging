@@ -18,8 +18,8 @@ public class SendSms {
                     .setToken("xxx"))
             .sendMessage(
                 new Msg()
-                    .setUser(new User().setUuid("+16184378358"))
-                    .setRecipient(new User().setUuid("+68987760041"))
+                    .setUser(new User().setUuid("+xxx"))
+                    .setRecipient(new User().setUuid("+xxx"))
                     .setContent("test"));
     }
 }
