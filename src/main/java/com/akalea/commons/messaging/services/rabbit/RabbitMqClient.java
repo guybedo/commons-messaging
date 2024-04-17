@@ -67,23 +67,21 @@ public class RabbitMqClient {
         }
     }
 
-    public RabbitMqClient declareExchange(String exchangeName, BuiltinExchangeType type) {
-        try {
-            createChannel().exchangeDeclare(exchangeName, type);
-            return this;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+    public void declareExchange(String exchange, BuiltinExchangeType type)
+        throws IOException,
+        TimeoutException {
+        this
+            .createChannel()
+            .exchangeDeclare(exchangeName, type);
     }
 
     public Channel createChannel() throws IOException, TimeoutException {
         if (this.connection == null || !this.connection.isOpen())
-            connect();
-        Channel channel = connection.createChannel();
-        return channel;
+            this.connect();
+        return this.connection.createChannel();
     }
 
-    public void setupExchange() throws IOException, TimeoutException {
+    protected void setupExchange() throws IOException, TimeoutException {
         int i = 0;
         Exception exceptionReference = null;
         while (i++ < 2) {
