@@ -6,6 +6,7 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -66,14 +67,26 @@ public class RabbitMqClient {
         }
     }
 
+    public void declareExchange(String exchange, BuiltinExchangeType type)
+        throws IOException,
+        TimeoutException {
+        this
+            .createChannel()
+            .exchangeDeclare(exchangeName, type);
+    }
+
+    public Channel createChannel() throws IOException, TimeoutException {
+        if (this.connection == null || !this.connection.isOpen())
+            this.connect();
+        return this.connection.createChannel();
+    }
+
     protected void setupExchange() throws IOException, TimeoutException {
         int i = 0;
         Exception exceptionReference = null;
         while (i++ < 2) {
             try {
-                if (this.connection == null || !this.connection.isOpen())
-                    connect();
-                channel = connection.createChannel();
+                channel = this.createChannel();
                 channel.addShutdownListener(new ShutdownListener() {
                     @Override
                     public void shutdownCompleted(ShutdownSignalException cause) {
