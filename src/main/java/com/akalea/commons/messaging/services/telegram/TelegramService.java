@@ -8,6 +8,7 @@ import com.akalea.commons.messaging.message.Msg;
 import com.akalea.commons.messaging.message.MsgReceipt;
 import com.akalea.commons.messaging.message.User;
 import com.akalea.commons.messaging.services.ServiceBase;
+import com.akalea.sugar.Collections;
 import com.google.common.collect.Lists;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.model.Message;
@@ -67,10 +68,10 @@ public class TelegramService extends ServiceBase {
                     .timeout(0);
             GetUpdatesResponse updatesResponse = bot.execute(getUpdates);
             List<Update> page = updatesResponse.updates();
-            allUpdates.addAll(page);
-            if (page.isEmpty()) {
+            if (page == null || page.isEmpty()) {
                 break;
             }
+            allUpdates.addAll(Collections.notNull(page));
             offset = page.get(page.size() - 1).updateId() + 1;
         }
         return allUpdates
