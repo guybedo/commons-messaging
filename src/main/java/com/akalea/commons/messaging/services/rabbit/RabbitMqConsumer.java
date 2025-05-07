@@ -52,6 +52,22 @@ public class RabbitMqConsumer extends RabbitMqClient {
 
     }
 
+    public RabbitMqConsumer(RabbitMqConsumerConfiguration configuration) {
+        this(
+            configuration.getHost(),
+            configuration.getPort(),
+            configuration.getUsername(),
+            configuration.getPassword(),
+            configuration.getExchangeName(),
+            configuration.getExchangeType(),
+            configuration.getQueueName(),
+            configuration.isDurable(),
+            configuration.isExclusive(),
+            configuration.isAutoDelete(),
+            configuration.getRoutingKey());
+        this.prefetchCount = configuration.getPrefetchCount();
+    }
+
     private void setupQueue() throws IOException, TimeoutException {
         try {
             if (channel == null)

@@ -17,12 +17,17 @@ public class RabbitMqClient {
 
     private final static Logger logger = LoggerFactory.getLogger(RabbitMqClient.class);
 
-    protected String     host;
-    protected int        port;
-    protected String     username;
-    protected String     password;
-    protected String     exchangeName;
-    protected String     exchangeType;
+    protected String host;
+    protected int    port;
+    protected String username;
+    protected String password;
+    protected String exchangeName;
+    protected String exchangeType;
+
+    protected Integer prefetchCount;
+    protected boolean confirmPublish;
+    protected long    confirmPublishDelayMsec;
+
     protected Connection connection;
     protected Channel    channel;
 
@@ -78,7 +83,12 @@ public class RabbitMqClient {
     public Channel createChannel() throws IOException, TimeoutException {
         if (this.connection == null || !this.connection.isOpen())
             this.connect();
-        return this.connection.createChannel();
+        Channel channel = this.connection.createChannel();
+        if (prefetchCount != null)
+            channel.basicQos(prefetchCount);
+        if (confirmPublish)
+            channel.confirmSelect();
+        return channel;
     }
 
     protected void setupExchange() throws IOException, TimeoutException {

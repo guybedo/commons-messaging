@@ -50,7 +50,7 @@
 		<dependency>
 			<groupId>com.akalea</groupId>
 			<artifactId>sugar</artifactId>
-			<version>0.0.12</version>
+			<version>0.0.14</version>
 		</dependency>
 		<dependency>
 			<groupId>com.squareup.okhttp3</groupId>
