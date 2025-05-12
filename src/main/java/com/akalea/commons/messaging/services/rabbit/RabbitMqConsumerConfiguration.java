@@ -18,6 +18,23 @@ public class RabbitMqConsumerConfiguration {
     private boolean confirmPublish;
     private long    confirmPublishDelayMsec;
 
+    public static RabbitMqConsumerConfiguration of(RabbitMqConsumerConfiguration c) {
+        return new RabbitMqConsumerConfiguration().setPrefetchCount(c.getPrefetchCount())
+            .setConfirmPublish(c.isConfirmPublish())
+            .setConfirmPublishDelayMsec(c.getConfirmPublishDelayMsec())
+            .setHost(c.getHost())
+            .setPort(c.getPort())
+            .setUsername(c.getUsername())
+            .setPassword(c.getPassword())
+            .setExchangeName(c.getExchangeName())
+            .setExchangeType(c.getExchangeType())
+            .setQueueName(c.getQueueName())
+            .setDurable(c.isDurable())
+            .setExclusive(c.isExclusive())
+            .setAutoDelete(c.isAutoDelete())
+            .setRoutingKey(c.getRoutingKey());
+    }
+
     public Integer getPrefetchCount() {
         return prefetchCount;
     }
