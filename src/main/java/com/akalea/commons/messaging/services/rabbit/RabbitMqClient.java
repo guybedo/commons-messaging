@@ -10,6 +10,8 @@ import com.rabbitmq.client.BuiltinExchangeType;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.RecoveryListener;
+import com.rabbitmq.client.Recoverable;
 import com.rabbitmq.client.ShutdownListener;
 import com.rabbitmq.client.ShutdownSignalException;
 
@@ -30,6 +32,7 @@ public class RabbitMqClient {
 
     protected Connection connection;
     protected Channel    channel;
+    protected RecoveryListener recoveryListener;
 
     public RabbitMqClient(
         String host,
@@ -60,6 +63,10 @@ public class RabbitMqClient {
             factory.setPassword(password);
         }
         this.connection = factory.newConnection();
+        
+        if (recoveryListener != null && this.connection instanceof Recoverable) {
+            ((Recoverable) this.connection).addRecoveryListener(recoveryListener);
+        }
     }
 
     public void disconnect() {
@@ -117,6 +124,9 @@ public class RabbitMqClient {
             }
         }
         throw new RuntimeException(exceptionReference);
-
+    }
+    
+    public void setRecoveryListener(RecoveryListener listener) {
+        this.recoveryListener = listener;
     }
 }
