@@ -1,46 +1,58 @@
 package com.akalea.commons.messaging.services.rabbit;
 
+import com.rabbitmq.client.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.rabbitmq.client.AMQP;
-import com.rabbitmq.client.Consumer;
-import com.rabbitmq.client.DefaultConsumer;
-import com.rabbitmq.client.Envelope;
-import com.rabbitmq.client.Recoverable;
-import com.rabbitmq.client.RecoveryListener;
-
 public class RabbitMqConsumer extends RabbitMqClient {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
-    private String   queueName;
-    private boolean  durable;
-    private boolean  exclusive;
-    private boolean  autoDelete;
-    private String   routingKey;
-    private Consumer consumer;
-    private String   consumerTag;
-    
-    private Function<String, Boolean> messageCallback;
-    private final AtomicBoolean isConsuming = new AtomicBoolean(false);
-    private final AtomicInteger retryCount = new AtomicInteger(0);
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private final ScheduledExecutorService healthMonitor = Executors.newSingleThreadScheduledExecutor();
-    private static final int MAX_RETRIES = 5;
-    private static final long INITIAL_RETRY_DELAY_MS = 1000;
-    private static final long HEALTH_CHECK_INTERVAL_MS = 30000; // 30 seconds
-    private volatile long lastMessageTime = System.currentTimeMillis();
+    private static final int  MAX_RETRIES              = 5;
+    private static final long INITIAL_RETRY_DELAY_MSEC = 1000;
+
+    private final String  queueName;
+    private final boolean durable;
+    private final boolean exclusive;
+    private final boolean autoDelete;
+    private final String  routingKey;
+
+    // --- CHANGE --- The consumer now manages its own channel instance.
+    // It's volatile because it can be reassigned by the recovery listener
+    // thread.
+    private volatile Channel channel;
+    private String           consumerTag;
+
+    private Function<String, Boolean>      messageCallback;
+    private final AtomicBoolean            isConsuming = new AtomicBoolean(false);
+    private final AtomicInteger            retryCount  = new AtomicInteger(0);
+    private final ScheduledExecutorService scheduler   =
+        Executors.newSingleThreadScheduledExecutor();
+
+    public RabbitMqConsumer(RabbitMqConsumerConfiguration configuration) {
+        this(
+            configuration.getHost(),
+            configuration.getPort(),
+            configuration.getUsername(),
+            configuration.getPassword(),
+            configuration.getExchangeName(),
+            configuration.getExchangeType(),
+            configuration.getQueueName(),
+            configuration.isDurable(),
+            configuration.isExclusive(),
+            configuration.isAutoDelete(),
+            configuration.getRoutingKey());
+        this.prefetchCount = configuration.getPrefetchCount();
+    }
 
     public RabbitMqConsumer(
         String host,
@@ -60,63 +72,50 @@ public class RabbitMqConsumer extends RabbitMqClient {
         this.exclusive = exclusive;
         this.autoDelete = autoDelete;
 
-        this.queueName = queueName;
-        if (this.exclusive && !this.durable)
+        if (exclusive) {
+            // Create a unique queue name for exclusive consumers
             this.queueName =
-                String.format(
-                    "%s-%s",
-                    queueName,
-                    UUID.randomUUID().toString().substring(0, 10));
-        
-        setupRecoveryListener();
-    }
-
-    public RabbitMqConsumer(RabbitMqConsumerConfiguration configuration) {
-        this(
-            configuration.getHost(),
-            configuration.getPort(),
-            configuration.getUsername(),
-            configuration.getPassword(),
-            configuration.getExchangeName(),
-            configuration.getExchangeType(),
-            configuration.getQueueName(),
-            configuration.isDurable(),
-            configuration.isExclusive(),
-            configuration.isAutoDelete(),
-            configuration.getRoutingKey());
-        this.prefetchCount = configuration.getPrefetchCount();
-        setupRecoveryListener();
-    }
-
-    private void setupQueue() throws IOException, TimeoutException {
-        try {
-            if (channel == null)
-                setupExchange();
-            channel.queueDeclare(
-                queueName,
-                durable,
-                exclusive,
-                autoDelete,
-                new HashMap<String, Object>());
-            channel.queueBind(queueName, exchangeName, routingKey);
-        } catch (Exception e) {
-            log.error("Error setting up queue", e);
+                String.format("%s-%s", queueName, UUID.randomUUID().toString().substring(0, 8));
+        } else {
+            this.queueName = queueName;
         }
+
+        // The recovery listener is key to resilience
+        setupRecoveryListener();
     }
 
     public void startConsuming(Function<String, Boolean> messageCallback) {
         this.messageCallback = messageCallback;
-        this.isConsuming.set(true);
+        if (!isConsuming.compareAndSet(false, true)) {
+            log.warn("Consumer is already running for queue [{}]", queueName);
+            return;
+        }
         this.retryCount.set(0);
-        this.lastMessageTime = System.currentTimeMillis();
-        startHealthMonitoring();
         attemptToStartConsuming();
     }
-    
+
     private void attemptToStartConsuming() {
+        if (!isConsuming.get()) {
+            return; // Guard against starting if stop was called.
+        }
+
         try {
-            setupQueue();
-            consumer = new DefaultConsumer(channel) {
+            // --- CHANGE --- The consumer now creates its own channel and sets
+            // up the queue topology.
+            // The old `setupQueue()` method is no longer needed.
+            log.info("Attempting to set up consumer for queue [{}]", queueName);
+            this.channel = createChannel(); // Request a new channel from the
+                                            // parent
+
+            // Declare exchange to ensure it exists (idempotent)
+            this.channel.exchangeDeclare(exchangeName, exchangeType, true);
+
+            // Declare and bind the queue
+            this.channel.queueDeclare(queueName, durable, exclusive, autoDelete, new HashMap<>());
+            this.channel.queueBind(queueName, exchangeName, routingKey);
+            log.info("Queue [{}] is declared and bound to exchange [{}]", queueName, exchangeName);
+
+            Consumer consumer = new DefaultConsumer(this.channel) {
                 @Override
                 public void handleDelivery(
                     String consumerTag,
@@ -124,139 +123,132 @@ public class RabbitMqConsumer extends RabbitMqClient {
                     AMQP.BasicProperties properties,
                     byte[] body)
                     throws IOException {
+                    long deliveryTag = envelope.getDeliveryTag();
                     try {
                         String message = new String(body, "UTF-8");
-                        lastMessageTime = System.currentTimeMillis(); // Update last message time
-                        messageCallback.apply(message);
+                        if (messageCallback.apply(message)) {
+                            channel.basicAck(deliveryTag, false);
+                        } else {
+                            log.warn(
+                                "Message processing failed, nacking and re-queuing message from queue [{}]",
+                                queueName);
+                            channel.basicNack(deliveryTag, false, true); // Re-queue
+                        }
                     } catch (Exception e) {
-                        log.error("Error while consuming message ", e);
+                        log.error(
+                            "Unhandled exception processing message from queue [{}]. Nacking without re-queue.",
+                            queueName,
+                            e);
+                        channel.basicNack(deliveryTag, false, false); // Do not
+                                                                      // re-queue
+                                                                      // (avoids
+                                                                      // poison
+                                                                      // messages)
                     }
                 }
             };
-            consumerTag = channel.basicConsume(queueName, true, consumer);
-            retryCount.set(0); // Reset retry count on successful connection
-            log.info("Successfully started consuming messages from queue: {}", queueName);
+
+            // Start consuming messages
+            this.consumerTag = this.channel.basicConsume(queueName, false, consumer); // autoAck
+                                                                                      // =
+                                                                                      // false
+            retryCount.set(0); // Reset on success
+            log.info("Successfully started consuming messages from queue [{}]", queueName);
+
         } catch (Exception e) {
-            log.error("Error while consuming messages ", e);
+            log.error(
+                "Failed to start consumer for queue [{}]. Error: {}",
+                queueName,
+                e.getMessage(),
+                e);
+            closeChannel(); // Clean up the failed channel
             scheduleRetry();
         }
     }
-    
+
     private void scheduleRetry() {
-        if (!isConsuming.get()) {
-            return; // Stop retrying if consuming was explicitly stopped
-        }
-        
+        if (!isConsuming.get())
+            return;
+
         int currentRetry = retryCount.incrementAndGet();
         if (currentRetry > MAX_RETRIES) {
-            log.error("Max retries ({}) exceeded. Stopping consumer for queue: {}", MAX_RETRIES, queueName);
-            isConsuming.set(false);
+            log.error(
+                "Max retries ({}) exceeded. Stopping consumer for queue [{}]",
+                MAX_RETRIES,
+                queueName);
+            stopConsuming();
             return;
         }
-        
-        long delay = INITIAL_RETRY_DELAY_MS * (long) Math.pow(2, currentRetry - 1);
-        log.warn("Scheduling retry {} after {} ms for queue: {}", currentRetry, delay, queueName);
-        
-        scheduler.schedule(() -> {
-            if (isConsuming.get()) {
-                attemptToStartConsuming();
-            }
-        }, delay, TimeUnit.MILLISECONDS);
+
+        long delay = INITIAL_RETRY_DELAY_MSEC * (long) Math.pow(2, currentRetry - 1);
+        log.warn("Scheduling retry {} in {} ms for queue [{}]", currentRetry, delay, queueName);
+        scheduler.schedule(this::attemptToStartConsuming, delay, TimeUnit.MILLISECONDS);
     }
-    
+
     private void setupRecoveryListener() {
         setRecoveryListener(new RecoveryListener() {
             @Override
             public void handleRecovery(Recoverable recoverable) {
-                log.info("Connection recovered, restarting consumer for queue: {}", queueName);
-                if (isConsuming.get() && messageCallback != null) {
-                    scheduler.schedule(() -> attemptToStartConsuming(), 100, TimeUnit.MILLISECONDS);
-                }
+                log.info(
+                    "Connection recovered for queue [{}]. Re-initializing consumer.",
+                    queueName);
+                retryCount.set(0);
+                attemptToStartConsuming(); // Re-run the setup logic on the new
+                                           // connection
             }
-            
+
             @Override
             public void handleRecoveryStarted(Recoverable recoverable) {
-                log.info("Recovery started for queue: {}", queueName);
+                log.info("Connection recovery started for queue [{}]", queueName);
             }
         });
     }
-    
-    private void startHealthMonitoring() {
-        healthMonitor.scheduleWithFixedDelay(() -> {
-            if (!isConsuming.get()) {
-                return;
-            }
-            
-            try {
-                // Check if connection and channel are alive
-                if (connection == null || !connection.isOpen() || 
-                    channel == null || !channel.isOpen()) {
-                    log.warn("Connection or channel is not open, triggering reconnection for queue: {}", queueName);
-                    scheduleRetry();
-                    return;
-                }
-                
-                // Check if consumer is still registered
-                if (consumer != null && channel.isOpen()) {
-                    try {
-                        // Try to get queue info as a basic health check
-                        channel.queueDeclarePassive(queueName);
-                    } catch (IOException e) {
-                        log.warn("Queue health check failed, restarting consumer for queue: {}", queueName);
-                        scheduleRetry();
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Health check failed for queue: " + queueName, e);
-                scheduleRetry();
-            }
-        }, HEALTH_CHECK_INTERVAL_MS, HEALTH_CHECK_INTERVAL_MS, TimeUnit.MILLISECONDS);
-    }
-    
+
     public void stopConsuming() {
-        isConsuming.set(false);
+        if (!isConsuming.compareAndSet(true, false)) {
+            return;
+        }
+        log.info("Stopping consumer for queue [{}]", queueName);
+        closeChannel();
+    }
+
+    private void closeChannel() {
+        // --- CHANGE --- Helper method to safely close the consumer's channel
         try {
-            if (channel != null && channel.isOpen() && consumerTag != null) {
-                channel.basicCancel(consumerTag);
+            if (this.channel != null && this.channel.isOpen()) {
+                if (consumerTag != null) {
+                    this.channel.basicCancel(consumerTag);
+                }
+                this.channel.close();
             }
         } catch (Exception e) {
-            log.error("Error stopping consumer", e);
+            log.error("Error closing channel for queue [{}]: {}", queueName, e.getMessage());
+        } finally {
+            this.channel = null;
+            this.consumerTag = null;
         }
     }
-    
+
     public void shutdown() {
         stopConsuming();
-        
-        // Shutdown schedulers
         scheduler.shutdown();
-        healthMonitor.shutdown();
-        
         try {
             if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
                 scheduler.shutdownNow();
             }
-            if (!healthMonitor.awaitTermination(5, TimeUnit.SECONDS)) {
-                healthMonitor.shutdownNow();
-            }
         } catch (InterruptedException e) {
             scheduler.shutdownNow();
-            healthMonitor.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        disconnect();
+        disconnect(); // Disconnects the parent connection
     }
-    
+
     public boolean isHealthy() {
-        return isConsuming.get() && 
-               connection != null && connection.isOpen() &&
-               channel != null && channel.isOpen();
-    }
-    
-    public int getRetryCount() {
-        return retryCount.get();
-    }
-    
-    public long getLastMessageTime() {
-        return lastMessageTime;
+        // --- CHANGE --- Checks the consumer's own channel instance
+        return isConsuming.get()
+            && connection != null
+            && connection.isOpen()
+            && this.channel != null
+            && this.channel.isOpen();
     }
 }

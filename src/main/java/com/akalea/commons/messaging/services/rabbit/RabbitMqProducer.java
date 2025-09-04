@@ -6,10 +6,14 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.rabbitmq.client.Channel;
+
 public class RabbitMqProducer extends RabbitMqClient {
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     private String routingKey;
+
+    private long confirmPublishDelayMsec;
 
     public RabbitMqProducer(
         String host,
@@ -34,6 +38,7 @@ public class RabbitMqProducer extends RabbitMqClient {
             configuration.getRoutingKey());
         this.confirmPublish = configuration.isConfirmPublish();
         this.confirmPublishDelayMsec = configuration.getConfirmPublishDelayMsec();
+
     }
 
     public void publish(String message) {
@@ -42,7 +47,7 @@ public class RabbitMqProducer extends RabbitMqClient {
 
     public void publish(String message, String routingKey, boolean autoDisconnect) {
         try {
-            setupExchange();
+            connect();
             for (int i = 0; i < 3; i++) {
                 boolean throwError = i == 3;
                 if (doPublish(message, routingKey, throwError))
@@ -58,9 +63,9 @@ public class RabbitMqProducer extends RabbitMqClient {
     }
 
     private boolean doPublish(String message, String routingKey, boolean throwError) {
-        try {
+        try (Channel channel = createChannel()) {
             channel.basicPublish(exchangeName, routingKey, null, message.getBytes());
-            if (confirmPublish && confirmPublishDelayMsec > 0) {
+            if (confirmPublish && this.confirmPublishDelayMsec > 0) {
                 channel.waitForConfirmsOrDie(confirmPublishDelayMsec);
             }
             return true;
