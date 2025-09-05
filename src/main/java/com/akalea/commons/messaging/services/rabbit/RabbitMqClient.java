@@ -135,7 +135,7 @@ public class RabbitMqClient {
      * Declares the exchange using a safe, temporary channel.
      */
     public void declareExchange() throws IOException, TimeoutException {
-        execute(channel -> channel.exchangeDeclare(exchangeName, exchangeType, true));
+        execute(channel -> channel.exchangeDeclare(exchangeName, exchangeType));
     }
 
     // The old setupExchange() method is removed entirely.
