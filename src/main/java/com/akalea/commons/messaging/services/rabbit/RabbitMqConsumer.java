@@ -108,7 +108,7 @@ public class RabbitMqConsumer extends RabbitMqClient {
                                             // parent
 
             // Declare exchange to ensure it exists (idempotent)
-            this.channel.exchangeDeclare(exchangeName, exchangeType, true);
+            this.channel.exchangeDeclare(exchangeName, exchangeType);
 
             // Declare and bind the queue
             this.channel.queueDeclare(queueName, durable, exclusive, autoDelete, new HashMap<>());
